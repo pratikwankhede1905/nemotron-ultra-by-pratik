@@ -1,90 +1,68 @@
-# Nemotron Ultra — Advanced AI Workspace
+# Nemotron Ultra — Deployable Render Project
 
-A structured AI chat workspace based on the original Nemotron Ultra HTML project.
+This version serves the frontend directly from the Express backend.
 
-## Project structure
+## Structure
 
 ```text
 Nemotron_Ultra_Project/
-├── README.md
 ├── frontend/
-│   └── index.html
+│   └── index.html                 # source frontend copy
 ├── backend/
+│   ├── public/
+│   │   └── index.html             # frontend actually served by Express
+│   ├── src/
+│   │   └── server.js              # web server + AI proxy
 │   ├── package.json
+│   ├── render.yaml
 │   ├── .env.example
-│   ├── .gitignore
-│   ├── start-windows.bat
-│   └── src/
-│       └── server.js
-└── docs/
-    └── ARCHITECTURE.md
+│   └── .gitignore
+├── docs/
+└── README.md
 ```
 
-## Features
+## Render deployment
 
-- Streaming AI chat
-- Image generation endpoint
-- PPTX generation
-- PDF generation
-- DOCX generation
-- XLSX generation
-- CSV / Markdown / TXT export
-- Document upload and extraction
-- Image upload
-- Chat history
-- Dark/light theme
-- Structured artifact envelope
-- Artifact validation and fallback export
-- Secure server-side API key handling
-- Retry handling for transient upstream errors
+Create a Render Web Service from this repository.
 
-## Run locally
+Use:
 
-### 1. Install Node.js 18+
+- Root Directory: `backend`
+- Runtime: Node
+- Build Command: `npm install`
+- Start Command: `npm start`
 
-Open a terminal in `backend/`.
-
-```bash
-npm install
-```
-
-### 2. Configure the secret
-
-Copy:
+Environment variables:
 
 ```text
-.env.example
+HF_TOKEN=YOUR_NEW_TOKEN
+HF_CHAT_URL=https://router.huggingface.co/v1/chat/completions
+HF_IMAGE_URL=https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0
 ```
 
-to:
+After deployment, open:
 
 ```text
-.env
+https://YOUR-SERVICE.onrender.com/
 ```
 
-Then put your Hugging Face token in `.env`.
+The `/` route serves `backend/public/index.html`.
 
-Do NOT put the token in `frontend/index.html`.
+Health check:
 
-### 3. Start the backend
-
-```bash
-npm start
+```text
+https://YOUR-SERVICE.onrender.com/health
 ```
 
-The backend listens on port 3000 by default.
+Expected response:
 
-### 4. Serve the frontend
-
-The frontend is currently an HTML application. For local development, serve the
-`frontend` directory through the same origin as the backend or configure your
-deployment/reverse proxy so `/api/*` reaches the Node backend.
-
-Do not rely on opening `index.html` directly with `file://` for the production setup.
+```json
+{"ok":true,"service":"nemotron-ultra-backend"}
+```
 
 ## Important
 
-The original uploaded HTML contained an API token in browser-side JavaScript.
-That token should be revoked/rotated before deploying this project.
+Do not put the Hugging Face token into browser JavaScript.
+Use Render Environment Variables.
 
-This package keeps the token in the backend environment instead.
+If you previously exposed a Hugging Face token in the original HTML, revoke/rotate it before production deployment.

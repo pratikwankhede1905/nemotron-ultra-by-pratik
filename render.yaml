@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: nemotron-ultra
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: HF_TOKEN
+        sync: false
+      - key: HF_CHAT_URL
+        value: https://router.huggingface.co/v1/chat/completions
+      - key: HF_IMAGE_URL
+        value: https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0
