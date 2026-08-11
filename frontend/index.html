@@ -1,0 +1,1612 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chat - Nemotron Ultra</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --sidebar-width: 260px;
+            --header-height: 60px;
+            --accent-color: #10a37f;
+            --accent-hover: #0d8c6d;
+            --bg-user: #f7f7f8;
+            --bg-assistant: #ffffff;
+            --border-color: #e5e5e5;
+        }
+
+        [data-bs-theme="dark"] {
+            --bg-user: #343541;
+            --bg-assistant: #444654;
+            --border-color: #4d4d4f;
+            --accent-color: #19c59f;
+            --accent-hover: #15a886;
+        }
+
+        * { scrollbar-width: thin; scrollbar-color: var(--border-color) transparent; }
+        *::-webkit-scrollbar { width: 8px; }
+        *::-webkit-scrollbar-track { background: transparent; }
+        *::-webkit-scrollbar-thumb { background-color: var(--border-color); border-radius: 4px; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: var(--sidebar-width);
+            height: 100vh;
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar.collapsed { transform: translateX(-100%); position: absolute; z-index: 1000; }
+        
+        .new-chat-btn {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            margin: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: transparent;
+            color: inherit;
+            width: calc(100% - 24px);
+        }
+
+        .new-chat-btn:hover { background: rgba(0,0,0,0.05); }
+        [data-bs-theme="dark"] .new-chat-btn:hover { background: rgba(255,255,255,0.05); }
+
+        .chat-history-item {
+            padding: 10px 14px;
+            margin: 2px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            transition: background 0.2s;
+        }
+
+        .chat-history-item:hover, .chat-history-item.active {
+            background: rgba(0,0,0,0.05);
+        }
+        [data-bs-theme="dark"] .chat-history-item:hover,
+        [data-bs-theme="dark"] .chat-history-item.active {
+            background: rgba(255,255,255,0.05);
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            position: relative;
+        }
+
+        .top-bar {
+            height: var(--header-height);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+        }
+
+        .model-selector {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding-bottom: 20px;
+        }
+
+        .message-wrapper {
+            width: 100%;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .message-wrapper.user { background: var(--bg-user); }
+        .message-wrapper.assistant { background: var(--bg-assistant); }
+
+        .message-content {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            display: flex;
+            gap: 16px;
+            line-height: 1.6;
+        }
+
+        .avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.85rem;
+            flex-shrink: 0;
+            margin-top: 4px;
+        }
+
+        .avatar.user { background: var(--accent-color); color: white; }
+        .avatar.assistant { background: #1a1a2e; color: #fff; }
+
+        .message-text { flex: 1; overflow-wrap: break-word; min-width: 0; }
+        .message-text p { margin-bottom: 0.8rem; }
+        .message-text p:last-child { margin-bottom: 0; }
+
+        .message-text pre {
+            background: #1e1e1e;
+            border-radius: 8px;
+            padding: 16px;
+            overflow-x: auto;
+            margin: 12px 0;
+            position: relative;
+        }
+
+        .message-text code {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.9em;
+        }
+
+        .message-text p code {
+            background: rgba(0,0,0,0.05);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        [data-bs-theme="dark"] .message-text p code {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #2d2d2d;
+            padding: 8px 16px;
+            border-radius: 8px 8px 0 0;
+            margin-bottom: -12px;
+            font-size: 0.8rem;
+            color: #ccc;
+        }
+
+        .copy-btn {
+            background: transparent;
+            border: 1px solid #555;
+            color: #ccc;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .copy-btn:hover { background: #444; color: #fff; }
+
+        .input-area {
+            border-top: 1px solid var(--border-color);
+            padding: 12px 20px 10px;
+            background: inherit;
+        }
+
+        .input-toolbar {
+            max-width: 800px;
+            margin: 0 auto 8px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .toolbar-btn {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: inherit;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .toolbar-btn:hover {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+        }
+
+        .input-wrapper {
+            max-width: 800px;
+            margin: 0 auto;
+            position: relative;
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+        }
+
+        .chat-input {
+            flex: 1;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 14px 16px;
+            resize: none;
+            outline: none;
+            font-size: 1rem;
+            line-height: 1.5;
+            max-height: 200px;
+            background: inherit;
+            color: inherit;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .chat-input:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1);
+        }
+
+        .send-btn {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background 0.2s;
+            flex-shrink: 0;
+            margin-bottom: 6px;
+        }
+
+        .send-btn:hover { background: var(--accent-hover); }
+        .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .input-footer {
+            text-align: center;
+            font-size: 0.75rem;
+            color: #888;
+            margin-top: 8px;
+        }
+
+        .credit-footer {
+            text-align: center;
+            font-size: 0.75rem;
+            color: #888;
+            margin-top: 4px;
+            font-style: italic;
+        }
+
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 4px 0;
+        }
+
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: var(--accent-color);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out;
+        }
+
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            color: #666;
+        }
+
+        .empty-state h1 {
+            font-size: 2.5rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            background: linear-gradient(90deg, var(--accent-color), #2563eb);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .example-prompts {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            max-width: 600px;
+            margin-top: 32px;
+            padding: 0 20px;
+        }
+
+        .example-card {
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        .example-card:hover {
+            border-color: var(--accent-color);
+            background: rgba(16, 163, 127, 0.05);
+        }
+
+        .example-card i { font-size: 1.5rem; margin-bottom: 8px; display: block; }
+        .example-card small { color: #888; }
+
+        @media (max-width: 768px) {
+            .sidebar { position: absolute; z-index: 1000; }
+            .message-content { padding: 16px 12px; }
+            .input-toolbar { flex-wrap: wrap; }
+        }
+
+        .stop-btn {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 140px;
+            background: var(--bg-assistant);
+            border: 1px solid var(--border-color);
+            padding: 8px 16px;
+            border-radius: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            z-index: 10;
+        }
+
+        .stop-btn.show { display: flex; }
+
+        /* Uploaded image in chat */
+        .uploaded-image {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            margin-top: 8px;
+        }
+
+        .file-attachment {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0,0,0,0.05);
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin-top: 8px;
+            font-size: 0.9rem;
+        }
+        [data-bs-theme="dark"] .file-attachment {
+            background: rgba(255,255,255,0.05);
+        }
+
+        /* Generated image card */
+        .generated-image-card {
+            margin-top: 12px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        .generated-image-card img {
+            width: 100%;
+            display: block;
+        }
+
+        .generated-image-card .img-actions {
+            padding: 10px;
+            display: flex;
+            gap: 10px;
+            background: var(--bg-user);
+        }
+
+        /* Message action buttons */
+        .msg-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .msg-action-btn {
+            font-size: 0.8rem;
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: transparent;
+            color: inherit;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s;
+        }
+
+        .msg-action-btn:hover {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+        }
+
+        /* Dropdown menu */
+        .attach-menu {
+            position: relative;
+        }
+
+        .attach-dropdown {
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            margin-bottom: 8px;
+            background: var(--bg-assistant);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            min-width: 220px;
+            display: none;
+            overflow: hidden;
+            z-index: 100;
+        }
+
+        .attach-dropdown.show { display: block; }
+
+        .attach-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.9rem;
+            transition: background 0.15s;
+        }
+
+        .attach-item:hover {
+            background: rgba(0,0,0,0.05);
+        }
+        [data-bs-theme="dark"] .attach-item:hover {
+            background: rgba(255,255,255,0.05);
+        }
+
+        .attach-item i { font-size: 1.2rem; }
+    </style>
+</head>
+<body>
+
+<!-- Hidden file inputs -->
+<input type="file" id="docInput" accept=".txt,.pdf,.docx,.md,.json,.csv" style="display:none" onchange="handleDocumentSelect(event)">
+<input type="file" id="imgInput" accept="image/*" style="display:none" onchange="handleImageSelect(event)">
+
+<div class="d-flex">
+    <!-- Sidebar -->
+    <div class="sidebar bg-body" id="sidebar">
+        <button class="new-chat-btn" onclick="newChat()">
+            <i class="bi bi-plus-lg"></i>
+            <span>New chat</span>
+        </button>
+        <div class="flex-grow-1 overflow-auto" id="chatHistory"></div>
+        <div class="border-top p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <div class="avatar assistant" style="width:28px;height:28px;font-size:0.75rem;">AI</div>
+                <small class="fw-semibold">Nemotron Ultra</small>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary w-100" onclick="toggleTheme()">
+                <i class="bi bi-moon-stars" id="themeIcon"></i> Toggle theme
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content bg-body">
+        <div class="top-bar">
+            <button class="btn btn-sm btn-outline-secondary d-md-none" onclick="toggleSidebar()">
+                <i class="bi bi-list"></i>
+            </button>
+            <div class="model-selector">Nemotron 3 Ultra 550B</div>
+            <button class="btn btn-sm btn-outline-secondary" onclick="toggleSidebar()" title="Toggle sidebar">
+                <i class="bi bi-layout-sidebar"></i>
+            </button>
+        </div>
+
+        <div class="messages-container" id="messagesContainer">
+            <div class="empty-state" id="emptyState">
+                <h1>How can I help you today?</h1>
+                <p class="text-muted">Chat, generate images, create PPTs & PDFs — powered by NVIDIA Nemotron 3 Ultra 550B</p>
+                <div class="example-prompts">
+                    <div class="example-card" onclick="setPrompt('Explain quantum computing in simple terms')">
+                        <i class="bi bi-cpu text-primary"></i>
+                        <div class="fw-semibold">Explain quantum computing</div>
+                        <small>in simple terms</small>
+                    </div>
+                    <div class="example-card" onclick="setPrompt('Write a Python function to sort a list of dictionaries by a key')">
+                        <i class="bi bi-code-slash text-success"></i>
+                        <div class="fw-semibold">Code assistant</div>
+                        <small>Python, JS, and more</small>
+                    </div>
+                    <div class="example-card" onclick="setPrompt('Generate an image of a futuristic city at sunset')">
+                        <i class="bi bi-image text-warning"></i>
+                        <div class="fw-semibold">Generate images</div>
+                        <small>AI art & illustrations</small>
+                    </div>
+                    <div class="example-card" onclick="setPrompt('Create a presentation about the benefits of renewable energy')">
+                        <i class="bi bi-file-earmark-slides text-info"></i>
+                        <div class="fw-semibold">Create PPT / PDF</div>
+                        <small>Export to PowerPoint</small>
+                    </div>
+                </div>
+            </div>
+            <div id="messagesList"></div>
+        </div>
+
+        <button class="stop-btn" id="stopBtn" onclick="stopGeneration()">
+            <i class="bi bi-stop-fill"></i> Stop generating
+        </button>
+
+        <!-- Input Area -->
+        <div class="input-area">
+            <div class="input-toolbar">
+                <div class="attach-menu">
+                    <button class="toolbar-btn" onclick="toggleAttachMenu()" id="attachBtn">
+                        <i class="bi bi-paperclip"></i> Attach
+                    </button>
+                    <div class="attach-dropdown" id="attachDropdown">
+                        <div class="attach-item" onclick="triggerDocUpload()">
+                            <i class="bi bi-file-earmark-text text-primary"></i>
+                            <div>
+                                <div class="fw-semibold">Upload Document</div>
+                                <small class="text-muted">PDF, DOCX, TXT</small>
+                            </div>
+                        </div>
+                        <div class="attach-item" onclick="triggerImageUpload()">
+                            <i class="bi bi-image text-success"></i>
+                            <div>
+                                <div class="fw-semibold">Upload Image</div>
+                                <small class="text-muted">JPG, PNG, GIF</small>
+                            </div>
+                        </div>
+                        <div class="attach-item" onclick="startImageGen()">
+                            <i class="bi bi-magic text-warning"></i>
+                            <div>
+                                <div class="fw-semibold">Generate Image</div>
+                                <small class="text-muted">AI text-to-image</small>
+                            </div>
+                        </div>
+                        <div class="attach-item" onclick="startPPTGen()">
+                            <i class="bi bi-file-earmark-slides text-info"></i>
+                            <div>
+                                <div class="fw-semibold">Create PPT</div>
+                                <small class="text-muted">PowerPoint presentation</small>
+                            </div>
+                        </div>
+                        <div class="attach-item" onclick="startPDFGen()">
+                            <i class="bi bi-file-earmark-pdf text-danger"></i>
+                            <div>
+                                <div class="fw-semibold">Create PDF</div>
+                                <small class="text-muted">Export document</small>
+                            </div>
+                        </div>
+                        <div class="attach-item" onclick="startArtifactGen('docx')">
+                            <i class="bi bi-file-earmark-word text-primary"></i>
+                            <div>
+                                <div class="fw-semibold">Create DOCX</div>
+                                <small class="text-muted">Word document</small>
+                            </div>
+                        </div>
+                        <div class="attach-item" onclick="startArtifactGen('xlsx')">
+                            <i class="bi bi-file-earmark-spreadsheet text-success"></i>
+                            <div>
+                                <div class="fw-semibold">Create XLSX</div>
+                                <small class="text-muted">Excel workbook</small>
+                            </div>
+                        </div>
+                        <div class="attach-item" onclick="startArtifactGen('md')">
+                            <i class="bi bi-markdown text-secondary"></i>
+                            <div>
+                                <div class="fw-semibold">Create Markdown</div>
+                                <small class="text-muted">.md source file</small>
+                            </div>
+                        </div>
+                        <div class="attach-item" onclick="startArtifactGen('txt')">
+                            <i class="bi bi-file-earmark-text text-secondary"></i>
+                            <div>
+                                <div class="fw-semibold">Create TXT</div>
+                                <small class="text-muted">Plain text file</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-wrapper">
+                <textarea 
+                    class="chat-input" 
+                    id="chatInput" 
+                    rows="1" 
+                    placeholder="Message Nemotron Ultra..."
+                    onkeydown="handleKeydown(event)"
+                    oninput="autoResize(this)"
+                ></textarea>
+                <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+                    <i class="bi bi-arrow-up"></i>
+                </button>
+            </div>
+            <div class="input-footer">
+                Nemotron 3 Ultra 550B can make mistakes. Consider checking important information.
+            </div>
+            <div class="credit-footer">
+                <i class="bi bi-heart-fill text-danger"></i> Website made and owned by <strong>Pratik Wankhede (CSBS)</strong>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Image Gen Modal -->
+<div class="modal fade" id="imageGenModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-magic me-2"></i>Generate Image</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <textarea class="form-control" id="imagePrompt" rows="3" placeholder="Describe the image you want to generate..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-primary" onclick="generateImage()">
+                    <i class="bi bi-magic me-1"></i> Generate
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@9.5.1/build/index.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<script>
+    // ========== CONFIG ==========
+    const API_URL = '/api/chat';
+    const IMAGE_API_URL = '/api/generate-image';
+    const MODEL = 'nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16:deepinfra';
+    const MAX_TOKENS = 16384;
+
+    // IMPORTANT:
+    // API credentials must live on your server, never in this browser file.
+    // Expected backend endpoints:
+    //   POST /api/chat
+    //   POST /api/generate-image
+    // See the backend contract in the comments near the end of this file.
+
+    // ========== STATE ==========
+    let messages = [];
+    let currentChatId = Date.now();
+    let chats = JSON.parse(localStorage.getItem('chats') || '{}');
+    let abortController = null;
+    let isGenerating = false;
+    let streamBuffer = '';
+    let lastRenderTime = 0;
+    const RENDER_INTERVAL = 80;
+
+    // ========== INIT ==========
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadChat(currentChatId);
+        renderChatHistory();
+        autoResize(document.getElementById('chatInput'));
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.attach-menu')) {
+                document.getElementById('attachDropdown').classList.remove('show');
+            }
+        });
+    });
+
+    // ========== UI HELPERS ==========
+    function toggleAttachMenu() {
+        document.getElementById('attachDropdown').classList.toggle('show');
+    }
+
+    function triggerDocUpload() {
+        document.getElementById('attachDropdown').classList.remove('show');
+        document.getElementById('docInput').click();
+    }
+
+    function triggerImageUpload() {
+        document.getElementById('attachDropdown').classList.remove('show');
+        document.getElementById('imgInput').click();
+    }
+
+    function startImageGen() {
+        document.getElementById('attachDropdown').classList.remove('show');
+        const modal = new bootstrap.Modal(document.getElementById('imageGenModal'));
+        modal.show();
+        setTimeout(() => document.getElementById('imagePrompt').focus(), 300);
+    }
+
+    function startPPTGen() {
+        document.getElementById('attachDropdown').classList.remove('show');
+        setPrompt('Create a detailed PowerPoint presentation about: ');
+        document.getElementById('chatInput').focus();
+    }
+
+    function startPDFGen() {
+        document.getElementById('attachDropdown').classList.remove('show');
+        setPrompt('Create a detailed PDF document about: ');
+        document.getElementById('chatInput').focus();
+    }
+
+    // ========== FILE UPLOADS ==========
+    async function handleDocumentSelect(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        e.target.value = '';
+
+        const ext = file.name.split('.').pop().toLowerCase();
+        let text = '';
+
+        try {
+            if (ext === 'txt' || ext === 'md' || ext === 'json' || ext === 'csv') {
+                text = await file.text();
+            } else if (ext === 'pdf') {
+                text = await extractPDFText(file);
+            } else if (ext === 'docx') {
+                text = await extractDOCXText(file);
+            } else {
+                throw new Error('Unsupported file type');
+            }
+
+            const truncated = text.length > 12000 ? text.slice(0, 12000) + '\n\n[Document truncated...]' : text;
+            const msg = {
+                role: 'user',
+                content: `I've uploaded a document named "${file.name}". Here is its content:\n\n---\n${truncated}\n---\n\nPlease analyze or summarize this document.`,
+                fileName: file.name
+            };
+            messages.push(msg);
+            renderMessages();
+            saveCurrentChat();
+            renderChatHistory();
+            sendMessage(true); // auto-send
+
+        } catch (err) {
+            alert('Error reading file: ' + err.message);
+        }
+    }
+
+    async function extractPDFText(file) {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let text = '';
+        for (let i = 1; i <= Math.min(pdf.numPages, 20); i++) {
+            const page = await pdf.getPage(i);
+            const content = await page.getTextContent();
+            text += content.items.map(item => item.str).join(' ') + '\n';
+        }
+        return text;
+    }
+
+    async function extractDOCXText(file) {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        return result.value;
+    }
+
+    async function handleImageSelect(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        e.target.value = '';
+
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const dataUrl = ev.target.result;
+            messages.push({
+                role: 'user',
+                content: '[Image uploaded]',
+                imageData: dataUrl,
+                fileName: file.name
+            });
+            renderMessages();
+            saveCurrentChat();
+            renderChatHistory();
+            // Don't auto-send; let user add a prompt
+            document.getElementById('chatInput').placeholder = 'Ask about this image...';
+            document.getElementById('chatInput').focus();
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // ========== ADVANCED ARTIFACT ENGINE ==========
+    //
+    // The model is asked for a validated artifact envelope:
+    // {
+    //   "artifact": {"type":"chat|image|pptx|pdf|docx|xlsx|csv|md|txt",
+    //                "title":"...", "content":"...", ...}
+    // }
+    // The browser never receives provider secrets. Generation happens through
+    // your backend and export is validated locally before download.
+
+    const ARTIFACT_SYSTEM = `
+You are the artifact-planning engine inside a multimodal AI assistant.
+Return useful answers AND, when the user requests a file, return an artifact envelope.
+
+Rules:
+1. Never invent missing facts. Ask only when a missing fact is necessary.
+2. Preserve numbers, names, dates and user-provided wording exactly unless asked to change them.
+3. For PPTX: use artifact.slides = [{title, subtitle?, bullets?, notes?, layout?}].
+4. For XLSX: use artifact.sheets = [{name, columns:[...], rows:[[...]]}].
+5. For DOCX/PDF: use artifact.content as Markdown.
+6. For CSV: use artifact.columns and artifact.rows.
+7. For image: use artifact.prompt with a detailed production prompt.
+8. For normal chat: artifact.type = "chat".
+9. Always set artifact.title.
+10. Keep artifact data JSON-safe. Do not wrap the envelope in a Markdown code fence.
+
+Envelope:
+{"artifact":{"type":"chat|image|pptx|pdf|docx|xlsx|csv|md|txt","title":"...","content":"...","prompt":"...","slides":[],"sheets":[],"columns":[],"rows":[]}}
+`;
+
+    function safeFileName(name, fallback='AI_Artifact') {
+        return (name || fallback).replace(/[<>:"/\\\\|?*\\x00-\\x1F]/g, '')
+            .replace(/\\s+/g, '_').slice(0, 90) || fallback;
+    }
+
+    function extractArtifact(raw) {
+        if (!raw) return null;
+        const cleaned = raw.trim().replace(/^```(?:json)?\\s*/i, '').replace(/\\s*```$/,'');
+        try {
+            const obj = JSON.parse(cleaned);
+            if (obj && obj.artifact) return normalizeArtifact(obj.artifact);
+        } catch (_) {}
+        // Recover JSON even when the model surrounded it with prose.
+        const a = cleaned.indexOf('{"artifact"');
+        const b = cleaned.lastIndexOf('}');
+        if (a >= 0 && b > a) {
+            try {
+                const obj = JSON.parse(cleaned.slice(a, b + 1));
+                if (obj && obj.artifact) return normalizeArtifact(obj.artifact);
+            } catch (_) {}
+        }
+        return null;
+    }
+
+    function normalizeArtifact(a) {
+        const allowed = ['chat','image','pptx','pdf','docx','xlsx','csv','md','txt'];
+        a.type = allowed.includes(a.type) ? a.type : 'chat';
+        a.title = String(a.title || 'AI Artifact').slice(0, 120);
+        a.content = typeof a.content === 'string' ? a.content : '';
+        a.prompt = typeof a.prompt === 'string' ? a.prompt : '';
+        a.slides = Array.isArray(a.slides) ? a.slides : [];
+        a.sheets = Array.isArray(a.sheets) ? a.sheets : [];
+        a.columns = Array.isArray(a.columns) ? a.columns : [];
+        a.rows = Array.isArray(a.rows) ? a.rows : [];
+        return a;
+    }
+
+    function artifactFromFallback(content, requestedType='chat') {
+        const type = requestedType || 'chat';
+        if (type === 'pptx') return {
+            type, title: content.split('\\n')[0].replace(/^#+\\s*/, '').slice(0,80) || 'Presentation',
+            content, slides: parseContentToSlides(content)
+        };
+        if (type === 'xlsx') return {
+            type, title: 'AI Workbook', content,
+            sheets: [{name:'Data', columns:['Content'], rows: content.split('\\n').filter(Boolean).map(x=>[x])}]
+        };
+        return {type, title: content.split('\\n')[0].slice(0,80) || 'AI Artifact', content};
+    }
+
+    function requestedArtifactType(text) {
+        const t = text.toLowerCase();
+        if (/\\b(pptx?|powerpoint|slides?|presentation)\\b/.test(t)) return 'pptx';
+        if (/\\b(pdf|report)\\b/.test(t)) return 'pdf';
+        if (/\\b(docx?|word document)\\b/.test(t)) return 'docx';
+        if (/\\b(xlsx?|excel|spreadsheet|table)\\b/.test(t)) return 'xlsx';
+        if (/\\bcsv\\b/.test(t)) return 'csv';
+        if (/\\b(markdown|\\.md)\\b/.test(t)) return 'md';
+        if (/\\b(txt|text file)\\b/.test(t)) return 'txt';
+        if (/\\b(generate|create|make)\\b.*\\b(image|picture|illustration|logo)\\b|\\btext[- ]to[- ]image\\b/.test(t)) return 'image';
+        return 'chat';
+    }
+
+    // ========== FILE UPLOADS ==========
+    async function handleDocumentSelect(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        e.target.value = '';
+        const ext = file.name.split('.').pop().toLowerCase();
+        let text = '';
+        try {
+            if (['txt','md','json','csv'].includes(ext)) text = await file.text();
+            else if (ext === 'pdf') text = await extractPDFText(file);
+            else if (ext === 'docx') text = await extractDOCXText(file);
+            else throw new Error('Unsupported file type');
+
+            // Keep context large enough for useful work but bounded for browser performance.
+            const MAX_UPLOAD_CHARS = 60000;
+            const truncated = text.length > MAX_UPLOAD_CHARS
+                ? text.slice(0, MAX_UPLOAD_CHARS) + '\\n\\n[Document truncated for model context]'
+                : text;
+
+            messages.push({
+                role:'user',
+                content:`I uploaded "${file.name}". Analyze this source.\\n\\n--- SOURCE START ---\\n${truncated}\\n--- SOURCE END ---`,
+                fileName:file.name
+            });
+            renderMessages(); saveCurrentChat(); renderChatHistory();
+            await sendMessage(true);
+        } catch(err) {
+            showToast('File error: ' + err.message, 'danger');
+        }
+    }
+
+    async function extractPDFText(file) {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({data:arrayBuffer}).promise;
+        let text='';
+        for(let i=1;i<=pdf.numPages;i++){
+            const page=await pdf.getPage(i);
+            const content=await page.getTextContent();
+            text += `\\n--- Page ${i} ---\\n` + content.items.map(x=>x.str).join(' ');
+        }
+        return text;
+    }
+
+    async function extractDOCXText(file) {
+        const result = await mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()});
+        return result.value;
+    }
+
+    function handleImageSelect(e) {
+        const file=e.target.files[0]; if(!file) return; e.target.value='';
+        const reader=new FileReader();
+        reader.onload=(ev)=>{
+            messages.push({role:'user',content:'[Image uploaded — ask me to analyze it]',imageData:ev.target.result,fileName:file.name});
+            renderMessages(); saveCurrentChat(); renderChatHistory();
+            document.getElementById('chatInput').placeholder='Ask about this image...';
+            document.getElementById('chatInput').focus();
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // ========== IMAGE GENERATION ==========
+    async function generateImage(prompt) {
+        if(!prompt) return;
+        const loadingId=Date.now();
+        messages.push({role:'user',content:`Generate an image: ${prompt}`});
+        messages.push({role:'assistant',content:'Generating image…',isImageLoading:true,id:loadingId});
+        renderMessages();
+
+        try {
+            const response=await fetch(IMAGE_API_URL,{
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({prompt, size:'1024x1024', quality:'high'})
+            });
+            if(!response.ok) throw new Error(`Image API ${response.status}: ${(await response.text()).slice(0,300)}`);
+            const data=await response.json();
+            const imageUrl=data.url || data.image_url || data.data?.[0]?.url;
+            if(!imageUrl) throw new Error('Backend returned no image URL');
+            const idx=messages.findIndex(m=>m.id===loadingId);
+            if(idx>=0) messages[idx]={role:'assistant',content:`Generated image: **${prompt}**`,generatedImage:imageUrl,prompt};
+            renderMessages(); saveCurrentChat();
+        } catch(e) {
+            const idx=messages.findIndex(m=>m.id===loadingId);
+            if(idx>=0) messages[idx]={role:'assistant',content:`**Image generation failed:** ${escapeHtml(e.message)}`};
+            renderMessages();
+        }
+    }
+
+    function startImageGen() {
+        document.getElementById('attachDropdown').classList.remove('show');
+        const modal=new bootstrap.Modal(document.getElementById('imageGenModal'));
+        modal.show();
+        setTimeout(()=>document.getElementById('imagePrompt').focus(),300);
+    }
+
+    async function startArtifactGen(type) {
+        document.getElementById('attachDropdown').classList.remove('show');
+        setPrompt(`Create a high-quality ${type.toUpperCase()} file about: `);
+        document.getElementById('chatInput').focus();
+    }
+
+    function startPPTGen(){ startArtifactGen('pptx'); }
+    function startPDFGen(){ startArtifactGen('pdf'); }
+
+    // ========== CHAT / MODEL ==========
+    async function sendMessage(auto=false) {
+        const input=document.getElementById('chatInput');
+        const content=input.value.trim();
+        if(!content && !auto) return;
+        if(isGenerating) return;
+
+        if(!auto){
+            messages.push({role:'user',content});
+            input.value=''; autoResize(input);
+            renderMessages(); saveCurrentChat(); renderChatHistory();
+        }
+
+        const lastUser=messages.slice().reverse().find(m=>m.role==='user');
+        const userText=lastUser?.content || '';
+        const wanted=requestedArtifactType(userText);
+
+        // Image requests can bypass the language model when explicitly requested.
+        if(wanted==='image'){
+            const prompt=userText.replace(/^.*?(generate|create|make)\\s+(an?\\s+)?image\\s*(of|for)?\\s*/i,'').trim() || userText;
+            await generateImage(prompt);
+            return;
+        }
+
+        const assistantMsg={role:'assistant',content:''};
+        messages.push(assistantMsg);
+        renderStreamingPlaceholder();
+        document.getElementById('stopBtn').classList.add('show');
+        isGenerating=true; updateSendButton(); streamBuffer='';
+
+        try{
+            abortController=new AbortController();
+            const conversation=[
+                {role:'system',content:ARTIFACT_SYSTEM},
+                ...messages
+                    .filter(m=>!m.isImageLoading && !m.generatedImage)
+                    .map(m=>({role:m.role,content:m.content}))
+            ];
+
+            const response=await fetch(API_URL,{
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({
+                    model:MODEL,
+                    messages:conversation,
+                    stream:true,
+                    max_tokens:MAX_TOKENS,
+                    temperature:0.2
+                }),
+                signal:abortController.signal
+            });
+            if(!response.ok) throw new Error(`API ${response.status}: ${(await response.text()).slice(0,500)}`);
+
+            const reader=response.body.getReader();
+            const decoder=new TextDecoder();
+            let buffer='';
+            while(true){
+                const {done,value}=await reader.read(); if(done) break;
+                buffer += decoder.decode(value,{stream:true});
+                const lines=buffer.split('\\n'); buffer=lines.pop();
+                for(const line of lines){
+                    const t=line.trim();
+                    if(!t || t==='data: [DONE]') continue;
+                    if(!t.startsWith('data:')) continue;
+                    try{
+                        const d=JSON.parse(t.slice(5).trim());
+                        const delta=d.choices?.[0]?.delta?.content ?? d.choices?.[0]?.text ?? '';
+                        if(delta){ assistantMsg.content+=delta; streamBuffer+=delta; }
+                    }catch(_){}
+                }
+                updateStreamingText(streamBuffer);
+            }
+
+            let artifact=extractArtifact(assistantMsg.content);
+            if(!artifact) artifact=artifactFromFallback(assistantMsg.content,wanted);
+
+            // If user explicitly asked for an artifact but the model returned chat,
+            // locally promote the response to the requested format.
+            if(wanted!=='chat' && artifact.type==='chat'){
+                artifact.type=wanted;
+            }
+
+            assistantMsg.artifact=artifact;
+            assistantMsg.content = artifact.type==='chat'
+                ? assistantMsg.content
+                : renderArtifactSummary(artifact);
+
+            finalizeMessage(assistantMsg.content);
+            saveCurrentChat(); renderChatHistory();
+
+            // Explicit artifact requests are generated immediately after validation.
+            if(artifact.type!=='chat'){
+                await exportArtifact(artifact);
+            }
+        }catch(error){
+            if(error.name==='AbortError') assistantMsg.content+='\\n\\n_[Generation stopped]_';
+            else assistantMsg.content+=`\\n\\n**Error:** ${escapeHtml(error.message)}`;
+            finalizeMessage(assistantMsg.content);
+        }finally{
+            isGenerating=false; abortController=null;
+            document.getElementById('stopBtn').classList.remove('show');
+            updateSendButton(); saveCurrentChat(); renderChatHistory(); streamBuffer='';
+        }
+    }
+
+    function renderArtifactSummary(a){
+        const labels={pptx:'PowerPoint',pdf:'PDF',docx:'Word',xlsx:'Excel',csv:'CSV',md:'Markdown',txt:'Text'};
+        return `### ${a.title}\\n\\n${a.content || `Your ${labels[a.type]||a.type} artifact is ready.`}\\n\\n**Artifact:** ${labels[a.type]||a.type}`;
+    }
+
+    // ========== EXPORT VALIDATION ==========
+    function validateArtifact(a){
+        if(!a || !a.type) throw new Error('Invalid artifact envelope');
+        if(!a.title) a.title='AI Artifact';
+        if(a.type==='pptx' && !a.slides.length) a.slides=parseContentToSlides(a.content||'');
+        if(a.type==='xlsx' && !a.sheets.length){
+            a.sheets=[{name:'Data',columns:['Content'],rows:(a.content||'').split('\\n').filter(Boolean).map(x=>[x])}];
+        }
+        if(a.type==='csv' && !a.rows.length) throw new Error('CSV requires rows');
+        return a;
+    }
+
+    async function exportArtifact(a){
+        try{
+            a=validateArtifact(a);
+            if(a.type==='pptx') await generatePPT(a);
+            else if(a.type==='pdf') await generatePDF(a);
+            else if(a.type==='docx') await generateDOCX(a);
+            else if(a.type==='xlsx') await generateXLSX(a);
+            else if(a.type==='csv') downloadBlob(toCSV(a.columns,a.rows),'text/csv',safeFileName(a.title)+'.csv');
+            else if(a.type==='md') downloadBlob(a.content,'text/markdown',safeFileName(a.title)+'.md');
+            else if(a.type==='txt') downloadBlob(stripMarkdown(a.content),'text/plain',safeFileName(a.title)+'.txt');
+            showToast(`${a.type.toUpperCase()} generated successfully`, 'success');
+        }catch(e){
+            console.error(e); showToast(`Export failed: ${e.message}`, 'danger');
+        }
+    }
+
+    // ========== PPTX ==========
+    async function generatePPT(a){
+        const pptx=new PptxGenJS();
+        pptx.layout='LAYOUT_WIDE'; pptx.author='Pratik Wankhede (CSBS)';
+        pptx.subject=a.title; pptx.title=a.title; pptx.company='AI Chat';
+        pptx.lang='en-US'; pptx.theme={headFontFace:'Aptos Display',bodyFontFace:'Aptos'};
+        const slides=a.slides || parseContentToSlides(a.content||'');
+        slides.forEach((sl,i)=>{
+            const s=pptx.addSlide();
+            s.background={color:'F8FAFC'};
+            s.addText(sl.title||`Slide ${i+1}`,{x:.6,y:.45,w:12.1,h:.55,fontSize:26,bold:true,color:'172033',margin:0});
+            if(sl.subtitle) s.addText(sl.subtitle,{x:.6,y:1.05,w:12,h:.35,fontSize:13,color:'64748B',margin:0});
+            const bullets=(sl.bullets||[]).slice(0,8);
+            if(bullets.length){
+                s.addText(bullets.map(x=>({text:String(x),options:{bullet:{indent:16},breakLine:true}})),{
+                    x:.75,y:1.55,w:11.6,h:5.0,fontSize:18,color:'243042',breakLine:false,
+                    paraSpaceAfterPt:12,fit:'shrink',valign:'top',margin:0.05
+                });
+            }
+            s.addText(`${i+1} / ${slides.length}`,{x:11.9,y:7.05,w:.7,h:.2,fontSize:8,color:'94A3B8',align:'right',margin:0});
+        });
+        await pptx.writeFile({fileName:safeFileName(a.title)+'.pptx'});
+    }
+
+    function parseContentToSlides(content){
+        const lines=content.split('\\n').map(x=>x.trim()).filter(Boolean);
+        const slides=[]; let cur={title:'Introduction',bullets:[]};
+        for(const line of lines){
+            if(/^#{1,2}\\s/.test(line)){
+                if(cur.bullets.length || cur.title!=='Introduction') slides.push(cur);
+                cur={title:line.replace(/^#{1,2}\\s*/,''),bullets:[]};
+            }else if(/^[-*•]\\s/.test(line)) cur.bullets.push(line.replace(/^[-*•]\\s*/,'')); 
+            else if(line.length>5) cur.bullets.push(stripMarkdown(line));
+            if(cur.bullets.length>=8){ slides.push(cur); cur={title:`Section ${slides.length+1}`,bullets:[]}; }
+        }
+        if(cur.bullets.length || !slides.length) slides.push(cur);
+        return slides;
+    }
+
+    // ========== PDF ==========
+    async function generatePDF(a){
+        const container=document.createElement('article');
+        container.style.cssText='width:794px;box-sizing:border-box;padding:58px 62px;background:white;color:#172033;font-family:Arial,sans-serif;line-height:1.6;';
+        container.innerHTML=`<h1 style="font-size:30px;margin:0 0 8px;">${escapeHtml(a.title)}</h1>
+        <div style="height:3px;background:#10a37f;margin:0 0 22px;"></div>
+        <div>${marked.parse(a.content||'')}</div>`;
+        document.body.appendChild(container);
+        try{
+            await html2pdf().set({
+                margin:0,filename:safeFileName(a.title)+'.pdf',
+                image:{type:'jpeg',quality:.98},
+                html2canvas:{scale:2,useCORS:true,logging:false},
+                pagebreak:{mode:['css','legacy']},
+                jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+            }).from(container).save();
+        }finally{container.remove();}
+    }
+
+    // ========== DOCX ==========
+    async function generateDOCX(a){
+        if(!window.docx) throw new Error('DOCX library unavailable');
+        const {Document,Packer,Paragraph,TextRun,HeadingLevel}=docx;
+        const children=[new Paragraph({text:a.title,heading:HeadingLevel.TITLE})];
+        const md=stripMarkdown(a.content||'').split('\\n');
+        md.forEach(line=>{
+            if(!line.trim()) children.push(new Paragraph({text:''}));
+            else children.push(new Paragraph({children:[new TextRun(line)]}));
+        });
+        const doc=new Document({sections:[{properties:{},children}]});
+        const blob=await Packer.toBlob(doc);
+        downloadBlob(blob,'application/vnd.openxmlformats-officedocument.wordprocessingml.document',safeFileName(a.title)+'.docx');
+    }
+
+    // ========== XLSX ==========
+    async function generateXLSX(a){
+        if(!window.XLSX) throw new Error('XLSX library unavailable');
+        const wb=XLSX.utils.book_new();
+        (a.sheets||[]).forEach((sheet,idx)=>{
+            const data=[sheet.columns||[],...(sheet.rows||[])];
+            const ws=XLSX.utils.aoa_to_sheet(data);
+            const name=safeSheetName(sheet.name||`Sheet${idx+1}`);
+            XLSX.utils.book_append_sheet(wb,ws,name);
+        });
+        if(!wb.SheetNames.length) throw new Error('No workbook sheets supplied');
+        XLSX.writeFile(wb,safeFileName(a.title)+'.xlsx');
+    }
+
+    function safeSheetName(n){return String(n||'Sheet').replace(/[\\\\/?*\\[\\]:]/g,'').slice(0,31)||'Sheet';}
+    function toCSV(columns,rows){
+        const esc=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+        return [columns,...rows].map(r=>r.map(esc).join(',')).join('\\r\\n');
+    }
+    function stripMarkdown(s){
+        return String(s||'').replace(/```[\\s\\S]*?```/g,'').replace(/[*_`#>~-]/g,'');
+    }
+    function downloadBlob(data,mime,name){
+        const blob=data instanceof Blob?data:new Blob([data],{type:mime});
+        const url=URL.createObjectURL(blob),a=document.createElement('a');
+        a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }
+
+    // ========== ACTIONS / UX ==========
+    async function downloadThisAsPPT(btn){
+        const a=getArtifactFromButton(btn,'pptx'); btn.disabled=true;
+        try{await exportArtifact(a);}finally{btn.disabled=false;}
+    }
+    async function downloadThisAsPDF(btn){
+        const a=getArtifactFromButton(btn,'pdf'); btn.disabled=true;
+        try{await exportArtifact(a);}finally{btn.disabled=false;}
+    }
+    async function downloadThisAsDOCX(btn){
+        const a=getArtifactFromButton(btn,'docx'); btn.disabled=true;
+        try{await exportArtifact(a);}finally{btn.disabled=false;}
+    }
+    async function downloadThisAsXLSX(btn){
+        const a=getArtifactFromButton(btn,'xlsx'); btn.disabled=true;
+        try{await exportArtifact(a);}finally{btn.disabled=false;}
+    }
+    async function downloadThisAsMarkdown(btn){
+        const a=getArtifactFromButton(btn,'md'); await exportArtifact(a);
+    }
+
+    function getArtifactFromButton(btn,type){
+        const wrapper=btn.closest('.message-wrapper');
+        const idx=[...document.querySelectorAll('.message-wrapper.assistant')].indexOf(wrapper);
+        const assistant=messages.filter(m=>m.role==='assistant'&&!m.generatedImage&&!m.isImageLoading)[idx];
+        const base=assistant?.artifact || artifactFromFallback(assistant?.content||'AI Artifact',type);
+        if(base.type==='chat') base.type=type;
+        return base;
+    }
+
+    function showToast(message,kind='info'){
+        const el=document.createElement('div');
+        el.className=`alert alert-${kind} position-fixed top-0 end-0 m-3 shadow`;
+        el.style.zIndex='9999'; el.textContent=message;
+        document.body.appendChild(el); setTimeout(()=>el.remove(),3500);
+    }
+
+    function stopGeneration(){if(abortController) abortController.abort();}
+
+    function renderStreamingPlaceholder(){
+        const container=document.getElementById('messagesList');
+        document.getElementById('emptyState').style.display='none';
+        const div=document.createElement('div');
+        div.className='message-wrapper assistant';
+        div.innerHTML=`<div class="message-content"><div class="avatar assistant">AI</div><div class="message-text streaming-text" style="white-space:pre-wrap;"></div></div>`;
+        container.appendChild(div); scrollToBottom();
+    }
+    function updateStreamingText(text){
+        const el=document.querySelector('.message-wrapper.assistant:last-child .streaming-text');
+        if(el){el.textContent=text;scrollToBottom();}
+    }
+    function finalizeMessage(content){
+        const wrappers=document.querySelectorAll('.message-wrapper.assistant');
+        const w=wrappers[wrappers.length-1]; if(!w)return;
+        const el=w.querySelector('.message-text');
+        el.classList.remove('streaming-text'); el.style.whiteSpace='normal'; el.innerHTML=marked.parse(content||'');
+        el.querySelectorAll('pre code').forEach(x=>hljs.highlightElement(x)); addCopyButtons(el);
+        const actions=document.createElement('div'); actions.className='msg-actions';
+        actions.innerHTML=`<button class="msg-action-btn" onclick="downloadThisAsPPT(this)">PPT</button>
+        <button class="msg-action-btn" onclick="downloadThisAsPDF(this)">PDF</button>
+        <button class="msg-action-btn" onclick="downloadThisAsDOCX(this)">DOCX</button>
+        <button class="msg-action-btn" onclick="downloadThisAsXLSX(this)">XLSX</button>
+        <button class="msg-action-btn" onclick="downloadThisAsMarkdown(this)">MD</button>`;
+        el.appendChild(actions); scrollToBottom();
+    }
+
+    // ========== CHAT STORAGE ==========
+    function newChat(){currentChatId=Date.now();messages=[];saveCurrentChat();renderMessages();renderChatHistory();document.getElementById('chatInput').focus();if(innerWidth<768)toggleSidebar();}
+    function loadChat(id){if(chats[id]){currentChatId=id;messages=chats[id].messages||[];renderMessages();}}
+    function saveCurrentChat(){
+        if(!messages.length){delete chats[currentChatId];}
+        else{
+            const u=messages.find(m=>m.role==='user');
+            const title=(u?.fileName||u?.content||'New Chat').slice(0,40);
+            chats[currentChatId]={title, messages, updated:Date.now()};
+        }
+        localStorage.setItem('chats',JSON.stringify(chats));
+    }
+    function renderChatHistory(){
+        const c=document.getElementById('chatHistory');
+        const sorted=Object.entries(chats).sort((a,b)=>b[1].updated-a[1].updated);
+        c.innerHTML=sorted.map(([id,ch])=>`<div class="chat-history-item ${id==currentChatId?'active':''}" onclick="loadChat(${id})"><i class="bi bi-chat-left-text"></i><span>${escapeHtml(ch.title)}</span></div>`).join('');
+    }
+    function setPrompt(text){const i=document.getElementById('chatInput');i.value=text;autoResize(i);}
+    function handleKeydown(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}}
+    function autoResize(t){t.style.height='auto';t.style.height=Math.min(t.scrollHeight,240)+'px';}
+    function updateSendButton(){const b=document.getElementById('sendBtn');b.disabled=isGenerating;b.innerHTML=isGenerating?'…':'<i class="bi bi-arrow-up"></i>';}
+    function scrollToBottom(){const c=document.getElementById('messagesContainer');c.scrollTop=c.scrollHeight;}
+    function addCopyButtons(container){
+        container.querySelectorAll('pre').forEach(pre=>{
+            if(pre.querySelector('.code-header'))return;
+            const code=pre.querySelector('code');
+            const lang=code?.className.match(/language-(\\w+)/)?.[1]||'code';
+            const h=document.createElement('div');h.className='code-header';
+            h.innerHTML=`<span>${lang}</span><button class="copy-btn" onclick="copyCode(this)"><i class="bi bi-clipboard"></i> Copy</button>`;
+            pre.parentNode.insertBefore(h,pre);
+        });
+    }
+    function copyCode(btn){const pre=btn.closest('.code-header').nextElementSibling;const code=pre.querySelector('code')||pre;navigator.clipboard.writeText(code.textContent).then(()=>{const old=btn.innerHTML;btn.innerHTML='✓ Copied';setTimeout(()=>btn.innerHTML=old,1500);});}
+    function escapeHtml(text){const d=document.createElement('div');d.textContent=text??'';return d.innerHTML;}
+    function toggleAttachMenu(){document.getElementById('attachDropdown').classList.toggle('show');}
+    function triggerDocUpload(){document.getElementById('attachDropdown').classList.remove('show');document.getElementById('docInput').click();}
+    function triggerImageUpload(){document.getElementById('attachDropdown').classList.remove('show');document.getElementById('imgInput').click();}
+    function toggleSidebar(){document.getElementById('sidebar').classList.toggle('collapsed');}
+    function toggleTheme(){const h=document.documentElement,i=document.getElementById('themeIcon');const dark=h.getAttribute('data-bs-theme')==='dark';h.setAttribute('data-bs-theme',dark?'light':'dark');i.className=dark?'bi bi-moon-stars':'bi bi-sun';localStorage.setItem('theme',dark?'light':'dark');}
+
+    // ========== MESSAGE RENDERING ==========
+    function renderMessages(){
+        const c=document.getElementById('messagesList'),empty=document.getElementById('emptyState');
+        if(!messages.length){empty.style.display='flex';c.innerHTML='';return;}
+        empty.style.display='none';
+        c.innerHTML=messages.map(msg=>{
+            const user=msg.role==='user'; let body='';
+            if(msg.generatedImage){
+                body=`<p>${marked.parseInline(msg.content||'')}</p><div class="generated-image-card"><img src="${msg.generatedImage}" alt="Generated image"><div class="img-actions"><a href="${msg.generatedImage}" target="_blank" class="btn btn-sm btn-primary">Open image</a><button class="btn btn-sm btn-outline-secondary" onclick="setPrompt('Create a variation of this image: ${escapeHtml(msg.prompt||'')}')">Variation</button></div></div>`;
+            }else if(msg.isImageLoading){body='<div class="typing-indicator"><span></span><span></span><span></span></div>';}
+            else if(msg.imageData){body=`<p>${escapeHtml(msg.content)}</p><img src="${msg.imageData}" class="uploaded-image" alt="${escapeHtml(msg.fileName||'Uploaded image')}">`;}
+            else if(msg.fileName){body=`<div class="file-attachment"><i class="bi bi-file-earmark-text"></i><span>${escapeHtml(msg.fileName)}</span></div><p>${user?escapeHtml(msg.content):marked.parse(msg.content||'')}</p>`;}
+            else body=user?escapeHtml(msg.content):marked.parse(msg.content||'');
+            return `<div class="message-wrapper ${msg.role}"><div class="message-content"><div class="avatar ${msg.role}">${user?'You':'AI'}</div><div class="message-text">${body}</div></div></div>`;
+        }).join('');
+        c.querySelectorAll('pre code').forEach(x=>hljs.highlightElement(x));
+        c.querySelectorAll('.message-text').forEach(el=>addCopyButtons(el));
+        scrollToBottom();
+    }
+
+    // Initial state
+    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    document.addEventListener('DOMContentLoaded',()=>{
+        loadChat(currentChatId); renderChatHistory(); autoResize(document.getElementById('chatInput'));
+        document.addEventListener('click',e=>{if(!e.target.closest('.attach-menu'))document.getElementById('attachDropdown').classList.remove('show');});
+        document.documentElement.setAttribute('data-bs-theme',localStorage.getItem('theme')||'light');
+        document.getElementById('themeIcon').className=(localStorage.getItem('theme')||'light')==='dark'?'bi bi-sun':'bi bi-moon-stars';
+    });
+
+    /*
+    ========================= BACKEND CONTRACT =========================
+    Keep provider API keys on the server.
+
+    POST /api/chat
+      Request:
+        { model, messages, stream, max_tokens, temperature }
+      Response:
+        OpenAI-compatible SSE:
+          data: {"choices":[{"delta":{"content":"..."}}]}
+          ...
+          data: [DONE]
+
+    POST /api/generate-image
+      Request:
+        { prompt, size, quality }
+      Response:
+        { "url": "https://..." }
+
+    Recommended server behavior:
+      - Read HF/OpenAI-compatible credentials from environment variables.
+      - Validate request body and maximum prompt size.
+      - Rate-limit requests.
+      - Retry transient 429/5xx errors with exponential backoff.
+      - Never return provider secrets to the browser.
+      - Set CORS only for your own domain.
+      - Add request IDs to errors for debugging.
+    */
+
+    // ========== RENDERING ==========
+    function renderMessages() {
+        const container = document.getElementById('messagesList');
+        const emptyState = document.getElementById('emptyState');
+        
+        if (messages.length === 0) {
+            emptyState.style.display = 'flex';
+            container.innerHTML = '';
+            return;
+        }
+        
+        emptyState.style.display = 'none';
+        container.innerHTML = messages.map((msg) => {
+            const isUser = msg.role === 'user';
+            let html = '';
+
+            if (msg.generatedImage) {
+                html = `
+                    <p>${marked.parseInline(msg.content)}</p>
+                    <div class="generated-image-card">
+                        <img src="${msg.generatedImage}" alt="Generated image">
+                        <div class="img-actions">
+                            <a href="${msg.generatedImage}" download="generated_image.png" class="btn btn-sm btn-primary">
+                                <i class="bi bi-download"></i> Download PNG
+                            </a>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="setPrompt('Variations of: ${escapeHtml(msg.prompt)}')">
+                                <i class="bi bi-arrow-repeat"></i> Variation
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else if (msg.isImageLoading) {
+                html = `<div class="typing-indicator"><span></span><span></span><span></span></div>`;
+            } else if (msg.imageData) {
+                html = `
+                    <p>${escapeHtml(msg.content)}</p>
+                    <img src="${msg.imageData}" class="uploaded-image" alt="${escapeHtml(msg.fileName)}">
+                `;
+            } else if (msg.fileName && !msg.imageData) {
+                html = `
+                    <div class="file-attachment">
+                        <i class="bi bi-file-earmark-text text-primary"></i>
+                        <span>${escapeHtml(msg.fileName)}</span>
+                    </div>
+                    <p style="margin-top:8px;">${isUser ? escapeHtml(msg.content) : marked.parse(msg.content)}</p>
+                `;
+            } else {
+                html = isUser ? escapeHtml(msg.content) : marked.parse(msg.content || '');
+            }
+
+            return `
+                <div class="message-wrapper ${msg.role}">
+                    <div class="message-content">
+                        <div class="avatar ${msg.role}">${isUser ? 'You' : 'AI'}</div>
+                        <div class="message-text">${html}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        container.querySelectorAll('pre code').forEach(block => {
+            hljs.highlightElement(block);
+        });
+        container.querySelectorAll('.message-text').forEach(el => {
+            if (!el.closest('.message-wrapper')?.querySelector('.generated-image-card')) {
+                addCopyButtons(el);
+            }
+        });
+        scrollToBottom();
+    }
+
+    function addCopyButtons(container) {
+        container.querySelectorAll('pre').forEach(pre => {
+            if (pre.querySelector('.code-header')) return;
+            const code = pre.querySelector('code');
+            const lang = code ? (code.className.match(/language-(\w+)/)?.[1] || 'code') : 'code';
+            
+            const header = document.createElement('div');
+            header.className = 'code-header';
+            header.innerHTML = `
+                <span>${lang}</span>
+                <button class="copy-btn" onclick="copyCode(this)">
+                    <i class="bi bi-clipboard"></i> Copy
+                </button>
+            `;
+            pre.parentNode.insertBefore(header, pre);
+        });
+    }
+
+    function copyCode(btn) {
+        const pre = btn.closest('.code-header').nextElementSibling;
+        const code = pre.querySelector('code') || pre;
+        navigator.clipboard.writeText(code.textContent).then(() => {
+            const original = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-check"></i> Copied!';
+            setTimeout(() => btn.innerHTML = original, 2000);
+        });
+    }
+
+    function scrollToBottom() {
+        const container = document.getElementById('messagesContainer');
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function handleKeydown(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    }
+
+    function autoResize(textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+    }
+
+    function updateSendButton() {
+        const btn = document.getElementById('sendBtn');
+        btn.disabled = isGenerating;
+        btn.innerHTML = isGenerating 
+            ? '<div class="typing-indicator"><span></span><span></span><span></span></div>' 
+            : '<i class="bi bi-arrow-up"></i>';
+    }
+
+    function toggleSidebar() {
+        document.getElementById('sidebar').classList.toggle('collapsed');
+    }
+
+    function toggleTheme() {
+        const html = document.documentElement;
+        const icon = document.getElementById('themeIcon');
+        if (html.getAttribute('data-bs-theme') === 'dark') {
+            html.setAttribute('data-bs-theme', 'light');
+            icon.className = 'bi bi-moon-stars';
+            localStorage.setItem('theme', 'light');
+        } else {
+            html.setAttribute('data-bs-theme', 'dark');
+            icon.className = 'bi bi-sun';
+            localStorage.setItem('theme', 'dark');
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-bs-theme', savedTheme);
+    document.getElementById('themeIcon').className = savedTheme === 'dark' ? 'bi bi-sun' : 'bi bi-moon-stars';
+</script>
+
+</body>
+</html>
